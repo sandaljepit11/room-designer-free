@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Aura Studio | Aesthetic Room Designer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap');
+        
+        :root {
+            --bg-cream: #FAF9F6;
+            --accent: #BFA07A;
+            --panel-border: rgba(230, 213, 195, 0.4);
+        }
+
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-cream);
+            color: #4A443F;
+            overflow: hidden;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.85);
+            backdrop-filter: blur(12px);
+            border: 1px solid var(--panel-border);
+        }
+
+        .canvas-area {
+            background-color: #F3F1ED;
+            background-image: radial-gradient(#D9D1C7 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+
+        .item-group { cursor: grab; }
+        .item-group:active { cursor: grabbing; }
+        .item-group.selected { filter: drop-shadow(0 0 12px rgba(191, 160, 122, 0.5)); }
+        
+        .selection-outline {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 2;
+            stroke-dasharray: 4 2;
+            pointer-events: none;
+        }
+
+        .swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: transform 0.2s, border 0.2s;
+            border: 2px solid transparent;
+        }
+        .swatch:hover { transform: scale(1.1); }
+        .swatch.active { border-color: #4A443F; transform: scale(1.15); }
+
+        .custom-scroll::-webkit-scrollbar { width: 5px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #E6D5C3; border-radius: 10px; }
+
+        input[type="color"] {
+            -webkit-appearance: none;
+            border: none;
+            width: 32px;
+            height: 32px;
+            cursor: pointer;
+            background: none;
+        }
+        input[type="color"]::-webkit-color-swatch-wrapper { padding: 0; }
+        input[type="color"]::-webkit-color-swatch { border-radius: 50%; border: 1px solid #ddd; }
+    </style>
+</head>
+<body class="h-screen flex flex-col">
+
+    <!-- Header -->
+    <header class="h-16 px-8 flex items-center justify-between glass-panel z-50 border-b">
+        <div class="flex items-center gap-3">
+            <div class="w-9 h-9 bg-[#4A443F] rounded-xl flex items-center justify-center text-white shadow-lg">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>
+            </div>
+            <div>
+                <h1 class="text-base font-bold tracking-tight leading-none">Aura Studio</h1>
+                <span class="text-[10px] text-stone-400 font-medium tracking-widest uppercase">Pro Room Designer</span>
+            </div>
+        </div>
+        <div class="flex items-center gap-4">
+            <button onclick="exportToPNG()" class="bg-[#4A443F] text-white px-6 py-2.5 rounded-full text-xs font-semibold hover:bg-black transition-all shadow-md flex items-center gap-2">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+                Download Design
+            </button>
+        </div>
+    </header>
+
+    <div class="flex-1 flex overflow-hidden">
+        
+        <!-- Left Panel: Furniture Library -->
+        <aside class="w-72 glass-panel border-r flex flex-col p-6 custom-scroll overflow-y-auto">
+            <h3 class="text-[10px] font-bold uppercase tracking-[0.15em] text-stone-400 mb-5">Furniture & Decor</h3>
+            <div id="libraryGrid" class="grid grid-cols-2 gap-3 mb-10">
+                <!-- JS populated -->
+            </div>
+
+            <h3 class="text-[10px] font-bold uppercase tracking-[0.15em] text-stone-400 mb-4">Mood Presets</h3>
+            <div class="space-y-2">
+                <button onclick="applyVibe('cozyNeutrals')" class="w-full text-left p-3.5 rounded-xl bg-white border border-stone-100 text-[11px] font-bold text-stone-600 hover:border-stone-300 transition-all flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-[#F2EBE1]"></span> Cozy Neutral
+                </button>
+                <button onclick="applyVibe('scandiCalm')" class="w-full text-left p-3.5 rounded-xl bg-white border border-stone-100 text-[11px] font-bold text-stone-600 hover:border-stone-300 transition-all flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-[#A8B898]"></span> Scandi Calm
+                </button>
+                <button onclick="applyVibe('darkCozy')" class="w-full text-left p-3.5 rounded-xl bg-white border border-stone-100 text-[11px] font-bold text-stone-600 hover:border-stone-300 transition-all flex items-center gap-3">
+                    <span class="w-3 h-3 rounded-full bg-[#4A443F]"></span> Dark Luxe
+                </button>
+            </div>
+        </aside>
+
+        <!-- Center: Canvas -->
+        <main class="flex-1 canvas-area flex items-center justify-center p-12 relative overflow-hidden">
+            <div id="canvasWrapper" class="bg-white shadow-[0_32px_64px_-16px_rgba(0,0,0,0.1)] relative transition-all duration-500 rounded-sm" style="width: 700px; height: 550px;">
+                <svg id="roomCanvas" width="700" height="550" viewBox="0 0 700 550" xmlns="http://www.w3.org/2000/svg" class="w-full h-full">
+                    <rect id="floor" width="700" height="550" fill="#F9F7F2" />
+                    <g id="itemsLayer"></g>
+                    <rect id="selectionBox" class="selection-outline" x="0" y="0" width="0" height="0" visibility="hidden" />
+                </svg>
+            </div>
+            
+            <div class="absolute bottom-8 left-1/2 -translate-x-1/2 px-5 py-2.5 bg-white/80 border border-white backdrop-blur shadow-sm rounded-full text-[10px] font-bold uppercase tracking-widest text-stone-400">
+                Drag to position • Click to edit
+            </div>
+        </main>
+
+        <!-- Right Panel: Editor -->
+        <aside class="w-80 glass-panel border-l flex flex-col custom-scroll overflow-y-auto">
+            
+            <!-- Global Room Settings (Persistent) -->
+            <div class="p-6 border-b border-stone-100 bg-stone-50/50">
+                <h3 class="text-[10px] font-bold uppercase tracking-[0.15em] text-stone-400 mb-4">Global Canvas</h3>
+                <div class="space-y-4">
+                    <div>
+                        <div class="flex justify-between items-center mb-2">
+                            <label class="text-[10px] font-bold uppercase tracking-widest text-stone-500">Floor Color</label>
+                            <input type="color" id="roomFloorColor" oninput="setFloorColor(this.value)">
+                        </div>
+                        <div id="roomFloorSwatches" class="flex gap-2 flex-wrap"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-6 flex-1">
+                <div id="emptyState" class="h-full flex flex-col items-center justify-center text-center py-20">
+                    <div class="w-16 h-16 rounded-full bg-stone-100 flex items-center justify-center mb-4 text-stone-300">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+                    </div>
+                    <p class="text-xs font-bold text-stone-400 uppercase tracking-widest">Select object<br>to customize</p>
+                </div>
+
+                <div id="editorPanel" class="hidden space-y-8 animate-in fade-in duration-300">
+                    <div class="flex items-center justify-between">
+                        <h2 class="font-bold text-lg text-stone-800" id="editorTitle">Edit Item</h2>
+                        <button onclick="deleteSelectedItem()" class="w-8 h-8 rounded-full bg-red-50 text-red-400 flex items-center justify-center hover:bg-red-100 transition-colors">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>
+                        </button>
+                    </div>
+
+                    <div class="space-y-5">
+                        <div class="grid grid-cols-2 gap-4">
+                            <div class="col-span-2">
+                                <label class="text-[9px] font-bold uppercase tracking-widest text-stone-400 block mb-2">Name</label>
+                                <input type="text" id="propName" class="w-full bg-white border border-stone-100 rounded-xl p-3 text-xs font-semibold outline-none focus:border-stone-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold uppercase tracking-widest text-stone-400 block mb-2">X Position</label>
+                                <input type="number" id="propX" class="w-full bg-white border border-stone-100 rounded-xl p-3 text-xs font-semibold outline-none focus:border-stone-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold uppercase tracking-widest text-stone-400 block mb-2">Y Position</label>
+                                <input type="number" id="propY" class="w-full bg-white border border-stone-100 rounded-xl p-3 text-xs font-semibold outline-none focus:border-stone-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold uppercase tracking-widest text-stone-400 block mb-2">Width</label>
+                                <input type="number" id="propW" class="w-full bg-white border border-stone-100 rounded-xl p-3 text-xs font-semibold outline-none focus:border-stone-300 shadow-sm">
+                            </div>
+                            <div>
+                                <label class="text-[9px] font-bold uppercase tracking-widest text-stone-400 block mb-2">Height</label>
+                                <input type="number" id="propH" class="w-full bg-white border border-stone-100 rounded-xl p-3 text-xs font-semibold outline-none focus:border-stone-300 shadow-sm">
+                            </div>
+                        </div>
+
+                        <div>
+                            <div class="flex justify-between items-center mb-2">
+                                <label class="text-[9px] font-bold uppercase tracking-widest text-stone-400">Rotation</label>
+                                <span class="text-[10px] font-bold text-stone-400"><span id="rotVal">0</span>°</span>
+                            </div>
+                            <input type="range" id="propR" min="0" max="360" class="w-full h-1 bg-stone-100 rounded-lg appearance-none cursor-pointer accent-[#4A443F]">
+                        </div>
+
+                        <div class="pt-4 border-t border-stone-100">
+                            <div class="flex justify-between items-center mb-4">
+                                <label class="text-[9px] font-bold uppercase tracking-widest text-stone-400">Object Color</label>
+                                <input type="color" id="propColorPicker" oninput="updateSelectedItem('color', this.value)">
+                            </div>
+                            
+                            <div class="mb-4">
+                                <select id="paletteSelect" onchange="updatePaletteDisplay(this.value)" class="w-full bg-stone-100 border-none rounded-lg p-2 text-[10px] font-bold uppercase tracking-wider text-stone-500 outline-none">
+                                    <option value="cozyNeutrals">Cozy Neutrals</option>
+                                    <option value="softLuxury">Soft Luxury</option>
+                                    <option value="minimalModern">Minimal Modern</option>
+                                    <option value="feminineSoft">Feminine Soft</option>
+                                    <option value="scandiCalm">Scandinavian Calm</option>
+                                    <option value="darkCozy">Dark & Moody</option>
+                                </select>
+                            </div>
+
+                            <div id="paletteSwatches" class="flex gap-2.5 flex-wrap">
+                                <!-- Swatches injected here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Footer settings -->
+            <div class="p-6 bg-stone-50/50 border-t border-stone-100 mt-auto">
+                <h3 class="text-[10px] font-bold uppercase tracking-widest text-stone-400 mb-4">Canvas Dimensions</h3>
+                <div class="space-y-4">
+                    <div class="flex items-center gap-4">
+                        <span class="text-[10px] font-bold text-stone-400 w-4">W</span>
+                        <input type="range" id="roomW" min="400" max="1000" value="700" class="flex-1 h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-stone-400">
+                    </div>
+                    <div class="flex items-center gap-4">
+                        <span class="text-[10px] font-bold text-stone-400 w-4">H</span>
+                        <input type="range" id="roomH" min="300" max="800" value="550" class="flex-1 h-1 bg-stone-200 rounded-lg appearance-none cursor-pointer accent-stone-400">
+                    </div>
+                </div>
+            </div>
+        </aside>
+    </div>
+
+    <script>
+        // --- COMPREHENSIVE COLOR SYSTEM ---
+        const PALETTES = {
+            cozyNeutrals: ['#FAF9F6', '#F5F5DC', '#E6D5C3', '#DCC8B6', '#BFA07A', '#8C7E6D', '#A6998A'],
+            softLuxury: ['#FFFFF0', '#F3E5AB', '#EAE0D5', '#C6AC8F', '#967969', '#EAD8C0', '#D4AF37'],
+            minimalModern: ['#FFFFFF', '#F2F2F2', '#D9D9D9', '#737373', '#404040', '#171717', '#E5E7EB'],
+            feminineSoft: ['#FFF5F5', '#FFE4E1', '#FADADD', '#E6E6FA', '#D8BFD8', '#F5E1DA', '#FFD1DC'],
+            scandiCalm: ['#F8F9FA', '#E9ECEF', '#CED4DA', '#A8B898', '#94A684', '#BCCCDC', '#E4E9BE'],
+            darkCozy: ['#3E362E', '#4A443F', '#2C2C2C', '#3D3D3D', '#555555', '#6B4226', '#1A1A1A']
+        };
+
+        const CATALOG = [
+            { type: 'bed', name: 'Queen Bed', w: 180, h: 220, color: '#FFFFFF', icon: '🛌' },
+            { type: 'nightstand', name: 'Nightstand', w: 50, h: 45, color: '#E6D5C3', icon: '🗄️' },
+            { type: 'wardrobe', name: 'Wardrobe', w: 160, h: 65, color: '#FAF9F6', icon: '🚪' },
+            { type: 'desk', name: 'Design Desk', w: 130, h: 65, color: '#E6D5C3', icon: '🖥️' },
+            { type: 'chair', name: 'Boucle Chair', w: 55, h: 55, color: '#4A443F', icon: '💺' },
+            { type: 'rug', name: 'Plush Rug', w: 260, h: 220, color: '#F2EBE1', icon: '🌫️' },
+            { type: 'plant', name: 'Olive Tree', w: 50, h: 50, color: '#A8B898', icon: '🌿' },
+            { type: 'mirror', name: 'Leaner Mirror', w: 70, h: 10, color: '#E0E0E0', icon: '🪞' },
+            { type: 'art', name: 'Gallery Art', w: 90, h: 6, color: '#E6D5C3', icon: '🖼️' },
+            { type: 'lamp', name: 'Orb Lamp', w: 30, h: 30, color: '#FFFFFF', icon: '💡' },
+            { type: 'window', name: 'Wide Window', w: 140, h: 12, color: '#F0F4F8', icon: '🪟' }
+        ];
+
+        // --- STATE ---
+        let items = [];
+        let selectedId = null;
+        let draggingId = null;
+        let offset = { x: 0, y: 0 };
+        let canvasDim = { w: 700, h: 550 };
+        let currentPaletteKey = 'cozyNeutrals';
+
+        // --- INIT ---
+        // ===== FREE TRIAL SYSTEM =====
+        const FREE_TRIAL_MINUTES = 5;
+        const START_KEY = "aura_studio_trial_start_time";
+
+        function startTrialTimer() {
+            let start = localStorage.getItem(START_KEY);
+
+            if (!start) {
+                start = Date.now();
+                localStorage.setItem(START_KEY, String(start));
+            } else {
+                start = parseInt(start, 10);
+            }
+
+            if (!start || Number.isNaN(start)) {
+                start = Date.now();
+                localStorage.setItem(START_KEY, String(start));
+            }
+
+            const interval = setInterval(() => {
+                const now = Date.now();
+                const elapsed = (now - start) / 1000 / 60;
+
+                if (elapsed >= FREE_TRIAL_MINUTES) {
+                    clearInterval(interval);
+                    showTrialOverlay();
+                }
+            }, 1000);
+        }
+
+        function showTrialOverlay() {
+            if (document.getElementById("trial-overlay")) return;
+
+            const overlay = document.createElement("div");
+            overlay.id = "trial-overlay";
+            overlay.style.position = "fixed";
+            overlay.style.inset = "0";
+            overlay.style.background = "rgba(20, 18, 16, 0.58)";
+            overlay.style.display = "flex";
+            overlay.style.alignItems = "center";
+            overlay.style.justifyContent = "center";
+            overlay.style.zIndex = "99999";
+            overlay.style.backdropFilter = "blur(6px)";
+            overlay.style.padding = "24px";
+
+            overlay.innerHTML = `
+                <div style="
+                    width: min(460px, 100%);
+                    background: rgba(255,255,255,0.96);
+                    border: 1px solid rgba(230, 213, 195, 0.6);
+                    border-radius: 24px;
+                    box-shadow: 0 24px 60px rgba(0,0,0,0.18);
+                    padding: 32px;
+                    text-align: center;
+                    font-family: 'Plus Jakarta Sans', sans-serif;
+                    color: #4A443F;
+                ">
+                    <div style="
+                        width: 56px;
+                        height: 56px;
+                        margin: 0 auto 16px auto;
+                        border-radius: 16px;
+                        background: #4A443F;
+                        color: white;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        box-shadow: 0 12px 24px rgba(74,68,63,0.2);
+                    ">
+                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                            <path d="M12 8v4l3 3"></path>
+                            <circle cx="12" cy="12" r="9"></circle>
+                        </svg>
+                    </div>
+                    <h2 style="margin:0 0 10px 0; font-size: 24px; line-height:1.2;">Free Trial Expired</h2>
+                    <p style="margin:0 0 20px 0; color:#7A7168; font-size:14px; line-height:1.7;">
+                        Your 5-minute free preview has ended. Unlock the full version to keep designing your aesthetic room with no limits.
+                    </p>
+                    <a href="https://gumroad.com/l/PRODUK-LO" target="_top" style="
+                        display:inline-flex;
+                        align-items:center;
+                        justify-content:center;
+                        gap:8px;
+                        padding:14px 22px;
+                        background:#4A443F;
+                        color:#ffffff;
+                        text-decoration:none;
+                        border-radius:999px;
+                        font-size:13px;
+                        font-weight:700;
+                        letter-spacing:0.02em;
+                        box-shadow: 0 10px 20px rgba(74,68,63,0.16);
+                    ">
+                        Get Full Access
+                    </a>
+                    <p style="margin:14px 0 0 0; color:#A49789; font-size:11px; letter-spacing:0.08em; text-transform:uppercase;">
+                        Replace the Gumroad link in the HTML before deploying
+                    </p>
+                </div>
+            `;
+
+            document.body.appendChild(overlay);
+        }
+
+        window.onload = () => {
+            initLibrary();
+            initGlobalColorUI();
+            setupDefaultRoom();
+            setupEventListeners();
+            updatePaletteDisplay('cozyNeutrals');
+            render();
+            startTrialTimer();
+        };
+
+        function initLibrary() {
+            const grid = document.getElementById('libraryGrid');
+            CATALOG.forEach(item => {
+                const btn = document.createElement('button');
+                btn.className = "btn-add p-4 bg-white rounded-2xl flex flex-col items-center justify-center gap-2 shadow-sm border border-stone-100 hover:shadow-md";
+                btn.onclick = () => addItem(item);
+                btn.innerHTML = `<span class="text-2xl">${item.icon}</span><span class="text-[9px] font-bold uppercase tracking-tighter text-stone-500">${item.name}</span>`;
+                grid.appendChild(btn);
+            });
+        }
+
+        function initGlobalColorUI() {
+            const container = document.getElementById('roomFloorSwatches');
+            container.innerHTML = '';
+            // Combined small list for global room colors
+            const globals = [...PALETTES.cozyNeutrals.slice(0,3), ...PALETTES.scandiCalm.slice(3,5), ...PALETTES.darkCozy.slice(0,2)];
+            globals.forEach(c => {
+                const s = document.createElement('div');
+                s.className = "swatch";
+                s.style.backgroundColor = c;
+                s.onclick = () => setFloorColor(c);
+                container.appendChild(s);
+            });
+        }
+
+        function updatePaletteDisplay(paletteKey) {
+            currentPaletteKey = paletteKey;
+            const container = document.getElementById('paletteSwatches');
+            container.innerHTML = '';
+            
+            PALETTES[paletteKey].forEach(color => {
+                const s = document.createElement('div');
+                s.className = `swatch ${items.find(i => i.id === selectedId)?.color === color ? 'active' : ''}`;
+                s.style.backgroundColor = color;
+                s.onclick = () => updateSelectedItem('color', color);
+                container.appendChild(s);
+            });
+        }
+
+        function setupDefaultRoom() {
+            items = [
+                { id: 1, type: 'rug', name: 'Plush Rug', x: 220, y: 160, w: 260, h: 220, r: 0, color: '#F2EBE1' },
+                { id: 2, type: 'bed', name: 'Queen Bed', x: 260, y: 150, w: 180, h: 220, r: 0, color: '#FFFFFF' },
+                { id: 3, type: 'nightstand', name: 'Nightstand', x: 200, y: 150, w: 50, h: 45, r: 0, color: '#E6D5C3' },
+                { id: 4, type: 'nightstand', name: 'Nightstand', x: 450, y: 150, w: 50, h: 45, r: 0, color: '#E6D5C3' },
+                { id: 5, type: 'wardrobe', name: 'Wardrobe', x: 40, y: 40, w: 160, h: 65, r: 0, color: '#FAF9F6' },
+                { id: 6, type: 'plant', name: 'Olive Tree', x: 600, y: 450, w: 55, h: 55, r: 0, color: '#A8B898' }
+            ];
+        }
+
+        // --- CORE INTERACTION ---
+        function setupEventListeners() {
+            const svg = document.getElementById('roomCanvas');
+
+            svg.addEventListener('pointerdown', e => {
+                const target = e.target.closest('.item-group');
+                if (target) {
+                    const id = parseInt(target.getAttribute('data-id'));
+                    selectItem(id);
+                    draggingId = id;
+                    
+                    const item = items.find(i => i.id === id);
+                    const pt = getMousePosition(e);
+                    offset = { x: pt.x - item.x, y: pt.y - item.y };
+                    
+                    if (target.setPointerCapture) {
+                        try { target.setPointerCapture(e.pointerId); } catch(err) {}
+                    }
+                } else {
+                    selectItem(null);
+                }
+            });
+
+            svg.addEventListener('pointermove', e => {
+                if (draggingId !== null) {
+                    const pt = getMousePosition(e);
+                    const item = items.find(i => i.id === draggingId);
+                    if (item) {
+                        item.x = Math.round(pt.x - offset.x);
+                        item.y = Math.round(pt.y - offset.y);
+                        updateUIInputs(item);
+                        render();
+                    }
+                }
+            });
+
+            window.addEventListener('pointerup', () => { draggingId = null; });
+
+            // Inputs
+            document.getElementById('propName').oninput = (e) => updateSelectedItem('name', e.target.value);
+            document.getElementById('propX').oninput = (e) => updateSelectedItem('x', e.target.value);
+            document.getElementById('propY').oninput = (e) => updateSelectedItem('y', e.target.value);
+            document.getElementById('propW').oninput = (e) => updateSelectedItem('w', e.target.value);
+            document.getElementById('propH').oninput = (e) => updateSelectedItem('h', e.target.value);
+            document.getElementById('propR').oninput = (e) => updateSelectedItem('r', e.target.value);
+            
+            document.getElementById('roomW').oninput = (e) => updateRoomSize('w', e.target.value);
+            document.getElementById('roomH').oninput = (e) => updateRoomSize('h', e.target.value);
+        }
+
+        function getMousePosition(evt) {
+            const svg = document.getElementById('roomCanvas');
+            const CTM = svg.getScreenCTM();
+            if (!CTM) return { x: 0, y: 0 };
+            return {
+                x: (evt.clientX - CTM.e) / CTM.a,
+                y: (evt.clientY - CTM.f) / CTM.d
+            };
+        }
+
+        function addItem(template) {
+            const id = Date.now();
+            const newItem = {
+                ...template,
+                id: id,
+                x: Math.round(canvasDim.w / 2 - template.w / 2),
+                y: Math.round(canvasDim.h / 2 - template.h / 2),
+                r: 0
+            };
+            items.push(newItem);
+            selectItem(id);
+            render();
+        }
+
+        function selectItem(id) {
+            selectedId = id;
+            const editor = document.getElementById('editorPanel');
+            const empty = document.getElementById('emptyState');
+            
+            if (id) {
+                const item = items.find(i => i.id === id);
+                if (item) {
+                    editor.classList.remove('hidden');
+                    empty.classList.add('hidden');
+                    updateUIInputs(item);
+                    updatePaletteDisplay(currentPaletteKey);
+                }
+            } else {
+                editor.classList.add('hidden');
+                empty.classList.remove('hidden');
+            }
+            render();
+        }
+
+        function updateUIInputs(item) {
+            document.getElementById('editorTitle').innerText = item.name;
+            document.getElementById('propName').value = item.name;
+            document.getElementById('propX').value = item.x;
+            document.getElementById('propY').value = item.y;
+            document.getElementById('propW').value = item.w;
+            document.getElementById('propH').value = item.h;
+            document.getElementById('propR').value = item.r;
+            document.getElementById('rotVal').innerText = item.r;
+            document.getElementById('propColorPicker').value = item.color;
+        }
+
+        function updateSelectedItem(key, val) {
+            if (!selectedId) return;
+            const item = items.find(i => i.id === selectedId);
+            if (item) {
+                if (key === 'name' || key === 'color') {
+                    item[key] = val;
+                } else {
+                    item[key] = parseInt(val) || 0;
+                }
+                if (key === 'r') document.getElementById('rotVal').innerText = val;
+                if (key === 'color') {
+                    document.getElementById('propColorPicker').value = val;
+                    updatePaletteDisplay(currentPaletteKey);
+                }
+                render();
+            }
+        }
+
+        function deleteSelectedItem() {
+            items = items.filter(i => i.id !== selectedId);
+            selectItem(null);
+        }
+
+        function setFloorColor(c) {
+            document.getElementById('floor').setAttribute('fill', c);
+            document.getElementById('roomFloorColor').value = c;
+        }
+
+        function updateRoomSize(axis, val) {
+            canvasDim[axis] = parseInt(val) || 500;
+            const wrap = document.getElementById('canvasWrapper');
+            const svg = document.getElementById('roomCanvas');
+            const floor = document.getElementById('floor');
+
+            wrap.style[axis === 'w' ? 'width' : 'height'] = canvasDim[axis] + 'px';
+            svg.setAttribute(axis === 'w' ? 'width' : 'height', canvasDim[axis]);
+            svg.setAttribute('viewBox', `0 0 ${canvasDim.w} ${canvasDim.h}`);
+            floor.setAttribute(axis === 'w' ? 'width' : 'height', canvasDim[axis]);
+            render();
+        }
+
+        function applyVibe(vibeKey) {
+            const p = PALETTES[vibeKey];
+            setFloorColor(p[0]);
+            currentPaletteKey = vibeKey;
+            document.getElementById('paletteSelect').value = vibeKey;
+            
+            // Distribute palette colors to items smartly
+            items.forEach((item, idx) => {
+                if (item.type === 'bed') item.color = '#FFFFFF';
+                else if (item.type === 'rug') item.color = p[1];
+                else item.color = p[2 + (idx % (p.length - 2))];
+            });
+            
+            if (selectedId) updatePaletteDisplay(vibeKey);
+            render();
+        }
+
+        // --- RENDERING ---
+        function render() {
+            const layer = document.getElementById('itemsLayer');
+            layer.innerHTML = '';
+            const sorted = [...items].sort((a,b) => a.type === 'rug' ? -1 : 1);
+
+            sorted.forEach(item => {
+                const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+                g.setAttribute('class', `item-group ${item.id === selectedId ? 'selected' : ''}`);
+                g.setAttribute('data-id', item.id);
+                g.setAttribute('transform', `translate(${item.x},${item.y}) rotate(${item.r},${item.w/2},${item.h/2})`);
+
+                if (item.type === 'bed') {
+                    g.appendChild(createSVGElement('rect', { width: item.w, height: item.h, rx: 12, fill: item.color, stroke: '#EAE0D5', 'stroke-width': 1 }));
+                    g.appendChild(createSVGElement('rect', { y: 65, width: item.w, height: item.h - 65, rx: 10, fill: '#F5F5F5', 'fill-opacity': 0.8 }));
+                    g.appendChild(createSVGElement('rect', { x: 20, y: 20, width: (item.w - 60)/2, height: 40, rx: 6, fill: 'white', stroke: '#F0EBE5' }));
+                    g.appendChild(createSVGElement('rect', { x: item.w/2 + 10, y: 20, width: (item.w - 60)/2, height: 40, rx: 6, fill: 'white', stroke: '#F0EBE5' }));
+                } 
+                else if (item.type === 'rug') {
+                    g.appendChild(createSVGElement('rect', { width: item.w, height: item.h, rx: 50, fill: item.color, 'stroke-dasharray': '6 3', stroke: '#D9C1A3', 'stroke-opacity': 0.5 }));
+                }
+                else if (item.type === 'plant') {
+                    g.appendChild(createSVGElement('circle', { cx: item.w/2, cy: item.h/2, r: item.w/2, fill: item.color, 'fill-opacity': 0.7 }));
+                    g.appendChild(createSVGElement('circle', { cx: item.w/2, cy: item.h/2, r: item.w/4, fill: '#6D5D4E' }));
+                }
+                else if (item.type === 'lamp') {
+                    g.appendChild(createSVGElement('circle', { cx: item.w/2, cy: item.h/2, r: item.w/2, fill: item.color, stroke: '#D9D1C7' }));
+                    g.appendChild(createSVGElement('circle', { cx: item.w/2, cy: item.h/2, r: item.w/3, fill: '#FFFEE0', 'fill-opacity': 0.9 }));
+                }
+                else if (item.type === 'window') {
+                    g.appendChild(createSVGElement('rect', { width: item.w, height: item.h, fill: item.color, stroke: '#BCCCDC', 'stroke-width': 2 }));
+                    g.appendChild(createSVGElement('line', { x1: item.w/2, y1: 0, x2: item.w/2, y2: item.h, stroke: '#BCCCDC' }));
+                }
+                else {
+                    g.appendChild(createSVGElement('rect', { width: item.w, height: item.h, rx: 6, fill: item.color, stroke: '#EAE0D5' }));
+                }
+
+                const label = document.createElementNS("http://www.w3.org/2000/svg", "text");
+                label.setAttribute('x', item.w/2);
+                label.setAttribute('y', item.h/2);
+                label.setAttribute('text-anchor', 'middle');
+                label.setAttribute('dominant-baseline', 'middle');
+                label.setAttribute('font-size', '9');
+                label.setAttribute('font-weight', '700');
+                label.setAttribute('fill', '#8C7E6D');
+                label.setAttribute('pointer-events', 'none');
+                label.style.textTransform = 'uppercase';
+                label.style.letterSpacing = '1.2px';
+                label.style.opacity = '0.6';
+                label.textContent = item.name;
+                g.appendChild(label);
+
+                layer.appendChild(g);
+
+                if (item.id === selectedId) {
+                    const outline = document.getElementById('selectionBox');
+                    outline.setAttribute('visibility', 'visible');
+                    outline.setAttribute('x', item.x - 6);
+                    outline.setAttribute('y', item.y - 6);
+                    outline.setAttribute('width', item.w + 12);
+                    outline.setAttribute('height', item.h + 12);
+                    outline.setAttribute('transform', `rotate(${item.r}, ${item.x + item.w/2}, ${item.y + item.h/2})`);
+                }
+            });
+
+            if (!selectedId) document.getElementById('selectionBox').setAttribute('visibility', 'hidden');
+        }
+
+        function createSVGElement(tag, attrs) {
+            const el = document.createElementNS("http://www.w3.org/2000/svg", tag);
+            for (let key in attrs) el.setAttribute(key, attrs[key]);
+            return el;
+        }
+
+        async function exportToPNG() {
+            const svg = document.getElementById('roomCanvas');
+            const oldId = selectedId;
+            selectItem(null); 
+
+            const data = new XMLSerializer().serializeToString(svg);
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const img = new Image();
+            
+            canvas.width = canvasDim.w * 2;
+            canvas.height = canvasDim.h * 2;
+            ctx.scale(2, 2);
+
+            img.onload = () => {
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(img, 0, 0);
+                const link = document.createElement('a');
+                link.download = `Aura-Studio-Design-${Date.now()}.png`;
+                link.href = canvas.toDataURL('image/png');
+                link.click();
+                selectItem(oldId);
+            };
+            img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(data)));
+        }
+    </script>
+</body>
+</html>
